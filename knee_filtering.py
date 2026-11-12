@@ -1,5 +1,6 @@
 import sys
-from functools import cache
+
+import joblib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas
@@ -9,21 +10,6 @@ from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 
 BASE_DIR = "forward_walking_molinaro"
-TRAINING_DATASETS = [
-    (1.2, "BT02_normal_walk_1_2_1-2"),
-    (1.8, "BT02_normal_walk_1_2_1-8"),
-    (2.0, "BT02_normal_walk_1_4_2-0"),
-    (2.5, "BT02_normal_walk_1_4_2-5"),
-]
-
-TESTING_DATASETS = [
-    (1.2, "BT06_normal_walk_1_2_1-2"),
-    (1.8, "BT06_normal_walk_1_2_1-8"),
-    (2.0, "BT06_normal_walk_1_2_2-0"),
-    (2.5, "BT06_normal_walk_1_2_2-5"),
-]
-
-VALUES = ["knee_angle_l", "hip_adduction_l", "knee_angle_r", "hip_adduction_r"]
 
 
 def solve_aa_ellipse(x, y):
@@ -50,7 +36,7 @@ def phase_variable(x, y):
 
 
 class Dataset:
-    def __init__(self, file_base, speed):
+    def __init__(self, speed, file_base):
         self.name = file_base
         self.angle_df = pandas.read_csv(f"{BASE_DIR}/{file_base}_off_angle_filt.csv")
         self.moment_df = pandas.read_csv(f"{BASE_DIR}/{file_base}_off_moment_filt.csv")
@@ -61,6 +47,7 @@ class Dataset:
         self.speed = speed
 
         # processing time!
+        print(f"{file_base}")
 
         angle, _, _ = self.load("knee_angle_l")
 
@@ -69,13 +56,17 @@ class Dataset:
         peaks, _ = find_peaks(acf)
         period_ticks = max(peaks, key=lambda p: acf[p])
         self.period = period_ticks * np.mean(self.dt)
+        print(f"  Period: {period_ticks} ({self.period:.02}s)")
 
         cycles = np.resize(angle, (len(angle) // period_ticks, period_ticks))
         mean_cycle = np.mean(cycles, axis=0)
 
         peaks, _ = find_peaks(-mean_cycle)
-        start = min(peaks, key=lambda p: mean_cycle[p])
-        offset = start * np.mean(self.dt)
+        self.start = min(
+            peaks, key=lambda p: mean_cycle[p]
+        )  # should be first real cycle!
+        print(f"  Start time: {self.start} ({self.start * 0.005:.03}s)")
+        offset = self.start * np.mean(self.dt)
         shifted_time = self.time - offset
         self.phase = np.mod(shifted_time, self.period) / self.period
 
@@ -85,107 +76,90 @@ class Dataset:
     def load(self, name):
         x = self.angle_df.get(name).to_numpy()
         v = np.gradient(x, self.time)
-        moment = self.moment_df.get(name + "_moment")
+        moment = self.moment_df.get(name + "_moment").to_numpy()
         if np.isnan(moment).any():
             print(f"[ERROR]: {self.name}.{name} has NaN moment")
             sys.exit(1)
         return (x, v, moment)
 
-    def make_phase_func_input(self):
-        angle, angular_rate, _ = self.load("knee_angle_l")
-        flexion, flexion_rate, _ = self.load("hip_flexion_r")
+    def make_training_data(self):
+        angle, angular_rate, moment = self.load("knee_angle_l")
+        flexion, flexion_rate, _ = self.load("knee_angle_r")
 
-        return np.column_stack(
-            [
-                angle,
-                angular_rate / self.speed,
-                flexion,
-                flexion_rate / self.speed,
-                self.speed * np.ones(self.time.shape),
-            ]
+        return (
+            np.column_stack(
+                [
+                    angle,
+                    angular_rate,
+                    flexion,
+                    flexion_rate,
+                    np.full_like(self.time, self.speed),
+                    np.full_like(self.time, 1 / self.speed),
+                ]
+            ),
+            moment.reshape(-1, 1),  # one column
         )
 
-    def make_phase_func_output(self):
-        phase_as_angle = 2 * np.pi * self.phase
-        return np.column_stack([np.sin(phase_as_angle), np.cos(phase_as_angle)])
+    def graph(self, ax, model):
+        inputs, correct = self.make_training_data()
+        knee_l, v_l, _ = self.load("knee_angle_l")
+        knee_r, v_r, _ = self.load("knee_angle_r")
+        ax.scatter(knee_l, knee_r, s=3, c=v_r)
+        # preds = model.predict(inputs)
+        # ax.scatter(self.phase, correct, s=3, c="gray", alpha=0.2)
+        # ax.scatter(self.phase, preds, s=3, c=correct, cmap="plasma", alpha=0.3)
+        # rmse = np.sqrt(np.mean(np.pow(correct - preds, 2)))
+        # print(f"{self.get_name()}: {rmse:.01}")
 
-    def make_moment_func_input(self):
-        return np.column_stack(
-            [
-                self.phase,
-                np.ones(self.phase.shape) * self.speed,
-            ]
-        )
 
-    def make_moment_func_output(self):
-        _, _, moment = self.load("knee_angle_l")
-        return np.column_stack([moment])
+TRAINING_DATASETS = [
+    Dataset(0.6, "BT02_normal_walk_1_2_0-6"),
+    Dataset(0.6, "BT06_normal_walk_1_2_0-6"),
+    Dataset(1.2, "BT02_normal_walk_1_2_1-2"),
+    Dataset(1.2, "BT06_normal_walk_1_2_1-2"),
+    Dataset(1.8, "BT02_normal_walk_1_2_1-8"),
+    Dataset(1.8, "BT06_normal_walk_1_2_1-8"),
+    Dataset(2.0, "BT02_normal_walk_1_4_2-0"),
+    Dataset(2.0, "BT06_normal_walk_1_2_2-0"),
+    Dataset(2.5, "BT02_normal_walk_1_4_2-5"),
+    Dataset(2.5, "BT06_normal_walk_1_2_2-5"),
+]
 
-    def graph(self, ax, phase_model, moment_model, target="phase"):
-        _, _, moment = self.load("knee_angle_l")
-
-        phase_pred_trig = phase_model.predict(self.make_phase_func_input())
-        phase_pred_angle = np.arctan2(phase_pred_trig[:, 0], phase_pred_trig[:, 1])
-        phase_pred = np.mod(phase_pred_angle / (2 * np.pi), 1)
-        if target == "phase":
-            ax.scatter(self.phase, moment, s=3, c=phase_pred, alpha=0.4, cmap="plasma")
-        if target == "moment":
-            moment_pred = moment_model.predict(
-                np.column_stack(
-                    [
-                        phase_pred,
-                        np.ones(self.phase.shape) * self.speed,
-                    ]
-                )
-            )
-            # moment_pred = moment_model.predict(self.make_moment_func_input())
-            ax.scatter(self.phase, moment, s=3, c="gray", alpha=0.2)
-            ax.scatter(self.phase, moment_pred, s=3, c=moment, cmap="plasma", alpha=0.5)
+TESTING_DATASETS = [
+    Dataset(1.2, "BT08_normal_walk_1_2_1-2"),
+    Dataset(1.8, "BT08_normal_walk_1_2_1-8"),
+    Dataset(2.0, "BT08_normal_walk_1_2_2-0"),
+    Dataset(2.5, "BT08_normal_walk_1_2_2-5"),
+]
 
 
 def main():
     _, axes = plt.subplots(2, 2)
-    phase_inputs = np.array([])
-    phase_outputs = np.array([])
-    moment_inputs = np.array([])
-    moment_outputs = np.array([])
+    inputs = np.array([])
+    outputs = np.array([])
     first = True
-    for d in TRAINING_DATASETS:
-        speed, name = d
-        dataset = Dataset(name, speed)
+    for dataset in TRAINING_DATASETS:
         if not first:
-            phase_inputs = np.vstack([phase_inputs, dataset.make_phase_func_input()])
-            phase_outputs = np.vstack([phase_outputs, dataset.make_phase_func_output()])
-            moment_inputs = np.vstack([moment_inputs, dataset.make_moment_func_input()])
-            moment_outputs = np.vstack(
-                [moment_outputs, dataset.make_moment_func_output()]
-            )
+            d_inputs, d_outputs = dataset.make_training_data()
+            inputs = np.vstack([inputs, d_inputs])
+            outputs = np.vstack([outputs, d_outputs])
         else:
-            phase_inputs = dataset.make_phase_func_input()
-            phase_outputs = dataset.make_phase_func_output()
-            moment_inputs = dataset.make_moment_func_input()
-            moment_outputs = dataset.make_moment_func_output()
+            inputs, outputs = dataset.make_training_data()
             first = False
 
-    phase_model = make_pipeline(
+    model = make_pipeline(
         StandardScaler(),
         PolynomialFeatures(degree=4, include_bias=False),
         Ridge(alpha=2.5),
     )
-    phase_model.fit(phase_inputs, phase_outputs)
+    model.fit(inputs, outputs)
 
-    moment_model = make_pipeline(
-        StandardScaler(),
-        PolynomialFeatures(degree=7, include_bias=False),
-        Ridge(alpha=0.5),
-    )
-    moment_model.fit(moment_inputs, moment_outputs)
-
-    for d, ax in zip(TESTING_DATASETS, np.ravel(axes)):
-        speed, name = d
-        dataset = Dataset(name, speed)
+    for dataset, ax in zip(TESTING_DATASETS, np.ravel(axes)):
         ax.set_title(dataset.get_name())
-        dataset.graph(ax, phase_model, moment_model, "moment")
+        dataset.graph(ax, model)
+
+    # save model to disk
+    joblib.dump(model, "model.xz", compress=True)
 
 
 if __name__ == "__main__":
