@@ -83,21 +83,21 @@ class Dataset:
         return (x, v, moment)
 
     def make_training_data(self):
-        angle, angular_rate, moment = self.load("knee_angle_l")
-        flexion, flexion_rate, _ = self.load("knee_angle_r")
+        angle_left, rate_left, moment_left = self.load("knee_angle_l")
+        angle_right, rate_right, _ = self.load("knee_angle_r")
 
         return (
             np.column_stack(
                 [
-                    angle,
-                    angular_rate,
-                    flexion,
-                    flexion_rate,
+                    angle_left,
+                    rate_left,
+                    angle_right,
+                    rate_right,
                     np.full_like(self.time, self.speed),
                     np.full_like(self.time, 1 / self.speed),
                 ]
             ),
-            moment.reshape(-1, 1),  # one column
+            moment_left.reshape(-1, 1),  # one column
         )
 
     def graph(self, ax, model):
