@@ -102,14 +102,14 @@ class Dataset:
 
     def graph(self, ax, model):
         inputs, correct = self.make_training_data()
-        knee_l, v_l, _ = self.load("knee_angle_l")
-        knee_r, v_r, _ = self.load("knee_angle_r")
-        ax.scatter(knee_l, knee_r, s=3, c=v_r)
-        # preds = model.predict(inputs)
-        # ax.scatter(self.phase, correct, s=3, c="gray", alpha=0.2)
-        # ax.scatter(self.phase, preds, s=3, c=correct, cmap="plasma", alpha=0.3)
-        # rmse = np.sqrt(np.mean(np.pow(correct - preds, 2)))
-        # print(f"{self.get_name()}: {rmse:.01}")
+        # knee_l, v_l, _ = self.load("knee_angle_l")
+        # knee_r, v_r, _ = self.load("knee_angle_r")
+        # ax.scatter(knee_l, knee_r, s=3, c=v_r)
+        preds = model.predict(inputs)
+        ax.scatter(self.phase, correct, s=3, c="gray", alpha=0.2)
+        ax.scatter(self.phase, preds, s=3, c=correct, cmap="plasma", alpha=0.3)
+        rmse = np.sqrt(np.mean(np.pow(correct - preds, 2)))
+        print(f"{self.get_name()}: {rmse:.01}")
 
 
 TRAINING_DATASETS = [
