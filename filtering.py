@@ -12,6 +12,11 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 BASE_DIR = "forward_walking_molinaro"
 
 
+def normalize(data):
+    centered = data - np.mean(data)
+    return centered / np.std(centered)
+
+
 def solve_aa_ellipse(x, y):
     design = np.column_stack([x**2, x, y, np.ones(x.shape)])
     sol, _, _, _ = np.linalg.lstsq(design, y**2)
@@ -117,13 +122,15 @@ class Dataset:
             ),
             hip_moment_left.reshape(-1, 1),  # one column
         )
-        return knee_training_data
-        # return hip_training_data
+        # return knee_training_data
+        return hip_training_data
 
     def graph(self, ax, model):
-        # knee_angle_left, knee_rate_left, knee_moment_left = self.load('knee_angle_l')
-        # knee_angle_right, knee_rate_right , _ = self.load('knee_angle_r')
-        # ax.scatter(knee_angle_left, knee_angle_right,s=3, c=knee_rate_right)
+        # knee_left, knee_rate_left, moment_left = self.load("knee_angle_l")
+        # knee_right, knee_rate_right, moment_right = self.load("knee_angle_r")
+        # hip_left, hip_rate_left, hip_moment_left = self.load("hip_flexion_l")
+        # hip_right, hip_rate_right, hip_moment_right = self.load("hip_flexion_r")
+        # ax.scatter(knee_left, knee_right, s=3, c=knee_rate_right)
 
         inputs, correct = self.make_training_data()
         preds = model.predict(inputs).reshape(-1, 1)
@@ -136,24 +143,23 @@ class Dataset:
 
 
 TRAINING_DATASETS = [
-    # Dataset(0.6, "BT02_normal_walk_1_2_0-6"),
-    # Dataset(0.6, "BT06_normal_walk_1_2_0-6"),
-    Dataset(1.2, "BT06_normal_walk_1_2_1-2"),
-    Dataset(1.8, "BT06_normal_walk_1_2_1-8"),
-    Dataset(2.0, "BT06_normal_walk_1_2_2-0"),
-    Dataset(2.5, "BT06_normal_walk_1_2_2-5"),
-    Dataset(1.2, "BT08_normal_walk_1_2_1-2"),
-    Dataset(1.8, "BT08_normal_walk_1_2_1-8"),
-    Dataset(2.0, "BT08_normal_walk_1_2_2-0"),
-    Dataset(2.5, "BT08_normal_walk_1_2_2-5"),
-]
-
-TESTING_DATASETS = [
+    Dataset(0.6, "BT02_normal_walk_1_2_0-6"),
+    Dataset(0.6, "BT06_normal_walk_1_2_0-6"),
     Dataset(1.2, "BT02_normal_walk_1_2_1-2"),
     Dataset(1.8, "BT02_normal_walk_1_2_1-8"),
     Dataset(2.0, "BT02_normal_walk_1_4_2-0"),
     Dataset(2.5, "BT02_normal_walk_1_4_2-5"),
-    # Dataset(0.6, "BT08_normal_walk_1_2_0-6"),
+    Dataset(1.2, "BT06_normal_walk_1_2_1-2"),
+    Dataset(1.8, "BT06_normal_walk_1_2_1-8"),
+    Dataset(2.0, "BT06_normal_walk_1_2_2-0"),
+    Dataset(2.5, "BT06_normal_walk_1_2_2-5"),
+]
+
+TESTING_DATASETS = [
+    Dataset(1.2, "BT08_normal_walk_1_2_1-2"),
+    Dataset(1.8, "BT08_normal_walk_1_2_1-8"),
+    Dataset(2.0, "BT08_normal_walk_1_2_2-0"),
+    Dataset(2.5, "BT08_normal_walk_1_2_2-5"),
 ]
 # TESTING_DATASETS = TRAINING_DATASETS
 
@@ -175,7 +181,7 @@ def main():
     model = make_pipeline(
         StandardScaler(),
         PolynomialFeatures(degree=3, include_bias=False),
-        Ridge(alpha=1.5),
+        Ridge(alpha=2.5),
     )
     model.fit(inputs, outputs)
 
@@ -190,4 +196,3 @@ def main():
 if __name__ == "__main__":
     main()
     plt.show()
-
