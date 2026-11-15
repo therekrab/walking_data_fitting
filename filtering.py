@@ -12,11 +12,6 @@ from sklearn.preprocessing import PolynomialFeatures, StandardScaler
 BASE_DIR = "forward_walking_molinaro"
 
 
-def normalize(data):
-    centered = data - np.mean(data)
-    return centered / np.std(centered)
-
-
 def solve_aa_ellipse(x, y):
     design = np.column_stack([x**2, x, y, np.ones(x.shape)])
     sol, _, _, _ = np.linalg.lstsq(design, y**2)
