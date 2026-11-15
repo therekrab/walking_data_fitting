@@ -84,37 +84,56 @@ class Dataset:
 
     def make_training_data(self):
         angle_left, rate_left, moment_left = self.load("knee_angle_l")
-        angle_right, rate_right, _ = self.load("knee_angle_r")
+        angle_right, rate_right, moment_right = self.load("knee_angle_r")
+        hip_left, hip_rate_left, hip_moment_left = self.load("hip_flexion_l")
+        hip_right, hip_rate_right, hip_moment_right = self.load("hip_flexion_r")
 
-        return (
+        knee_training_data = (
             np.column_stack(
                 [
                     angle_left,
-                    rate_left,
                     angle_right,
+                    rate_left,
                     rate_right,
                     np.full_like(self.time, self.speed),
-                    np.full_like(self.time, 1 / self.speed),
                 ]
             ),
             moment_left.reshape(-1, 1),  # one column
         )
 
+        hip_training_data = (
+            np.column_stack(
+                [
+                    hip_left,
+                    hip_right,
+                    hip_rate_left,
+                    hip_rate_right,
+                    np.full_like(self.time, self.speed),
+                ]
+            ),
+            hip_moment_left.reshape(-1, 1),  # one column
+        )
+        # return knee_training_data
+        return hip_training_data
+
     def graph(self, ax, model):
+        # knee_angle_left, knee_rate_left, knee_moment_left = self.load('knee_angle_l')
+        # knee_angle_right, knee_rate_right , _ = self.load('knee_angle_r')
+        # ax.scatter(knee_angle_left, knee_angle_right,s=3, c=knee_rate_right)
+
         inputs, correct = self.make_training_data()
-        # knee_l, v_l, _ = self.load("knee_angle_l")
-        # knee_r, v_r, _ = self.load("knee_angle_r")
-        # ax.scatter(knee_l, knee_r, s=3, c=v_r)
-        preds = model.predict(inputs)
+        preds = model.predict(inputs).reshape(-1, 1)
+        err_squared = np.pow(preds - correct, 2)
+        print(f"size: {err_squared.shape}")
         ax.scatter(self.phase, correct, s=3, c="gray", alpha=0.2)
-        ax.scatter(self.phase, preds, s=3, c=correct, cmap="plasma", alpha=0.3)
+        ax.scatter(self.phase, preds, s=3, c=err_squared, cmap="plasma", alpha=0.3)
         rmse = np.sqrt(np.mean(np.pow(correct - preds, 2)))
-        print(f"{self.get_name()}: {rmse:.01}")
+        print(f"{self.get_name()}: {rmse:.03}")
 
 
 TRAINING_DATASETS = [
-    Dataset(0.6, "BT02_normal_walk_1_2_0-6"),
-    Dataset(0.6, "BT06_normal_walk_1_2_0-6"),
+    # Dataset(0.6, "BT02_normal_walk_1_2_0-6"),
+    # Dataset(0.6, "BT06_normal_walk_1_2_0-6"),
     Dataset(1.2, "BT02_normal_walk_1_2_1-2"),
     Dataset(1.2, "BT06_normal_walk_1_2_1-2"),
     Dataset(1.8, "BT02_normal_walk_1_2_1-8"),
@@ -126,11 +145,13 @@ TRAINING_DATASETS = [
 ]
 
 TESTING_DATASETS = [
+    # Dataset(0.6, "BT08_normal_walk_1_2_0-6"),
     Dataset(1.2, "BT08_normal_walk_1_2_1-2"),
     Dataset(1.8, "BT08_normal_walk_1_2_1-8"),
     Dataset(2.0, "BT08_normal_walk_1_2_2-0"),
     Dataset(2.5, "BT08_normal_walk_1_2_2-5"),
 ]
+# TESTING_DATASETS = TRAINING_DATASETS
 
 
 def main():
@@ -149,8 +170,8 @@ def main():
 
     model = make_pipeline(
         StandardScaler(),
-        PolynomialFeatures(degree=4, include_bias=False),
-        Ridge(alpha=2.5),
+        PolynomialFeatures(degree=3, include_bias=False),
+        Ridge(alpha=1.5),
     )
     model.fit(inputs, outputs)
 
