@@ -108,13 +108,17 @@ class Dataset:
                     hip_right,
                     hip_rate_left,
                     hip_rate_right,
+                    angle_left,
+                    angle_right,
+                    rate_left,
+                    rate_right,
                     np.full_like(self.time, self.speed),
                 ]
             ),
             hip_moment_left.reshape(-1, 1),  # one column
         )
-        # return knee_training_data
-        return hip_training_data
+        return knee_training_data
+        # return hip_training_data
 
     def graph(self, ax, model):
         # knee_angle_left, knee_rate_left, knee_moment_left = self.load('knee_angle_l')
@@ -134,22 +138,22 @@ class Dataset:
 TRAINING_DATASETS = [
     # Dataset(0.6, "BT02_normal_walk_1_2_0-6"),
     # Dataset(0.6, "BT06_normal_walk_1_2_0-6"),
-    Dataset(1.2, "BT02_normal_walk_1_2_1-2"),
     Dataset(1.2, "BT06_normal_walk_1_2_1-2"),
-    Dataset(1.8, "BT02_normal_walk_1_2_1-8"),
     Dataset(1.8, "BT06_normal_walk_1_2_1-8"),
-    Dataset(2.0, "BT02_normal_walk_1_4_2-0"),
     Dataset(2.0, "BT06_normal_walk_1_2_2-0"),
-    Dataset(2.5, "BT02_normal_walk_1_4_2-5"),
     Dataset(2.5, "BT06_normal_walk_1_2_2-5"),
-]
-
-TESTING_DATASETS = [
-    # Dataset(0.6, "BT08_normal_walk_1_2_0-6"),
     Dataset(1.2, "BT08_normal_walk_1_2_1-2"),
     Dataset(1.8, "BT08_normal_walk_1_2_1-8"),
     Dataset(2.0, "BT08_normal_walk_1_2_2-0"),
     Dataset(2.5, "BT08_normal_walk_1_2_2-5"),
+]
+
+TESTING_DATASETS = [
+    Dataset(1.2, "BT02_normal_walk_1_2_1-2"),
+    Dataset(1.8, "BT02_normal_walk_1_2_1-8"),
+    Dataset(2.0, "BT02_normal_walk_1_4_2-0"),
+    Dataset(2.5, "BT02_normal_walk_1_4_2-5"),
+    # Dataset(0.6, "BT08_normal_walk_1_2_0-6"),
 ]
 # TESTING_DATASETS = TRAINING_DATASETS
 
@@ -186,3 +190,4 @@ def main():
 if __name__ == "__main__":
     main()
     plt.show()
+
